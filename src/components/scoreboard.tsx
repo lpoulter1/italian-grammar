@@ -16,15 +16,19 @@ type ScoreboardProps = {
 
 export function Scoreboard({ scores, isLoading }: ScoreboardProps) {
   if (isLoading) {
-    return <div className="text-center py-4">Loading scores...</div>;
+    return (
+      <div className="text-center py-4 text-muted-foreground">
+        Loading scores...
+      </div>
+    );
   }
 
   return (
-    <div className="w-full">
+    <div className="w-full rounded-lg border border-slate-200 dark:border-slate-800">
       <Table>
         <TableCaption>Top scores from all players</TableCaption>
         <TableHeader>
-          <TableRow>
+          <TableRow className="hover:bg-slate-100/50 dark:hover:bg-slate-800/50">
             <TableHead>Player</TableHead>
             <TableHead>Score</TableHead>
             <TableHead>Accuracy</TableHead>
@@ -35,7 +39,10 @@ export function Scoreboard({ scores, isLoading }: ScoreboardProps) {
         </TableHeader>
         <TableBody>
           {scores.map((score) => (
-            <TableRow key={score.id}>
+            <TableRow
+              key={score.id}
+              className="hover:bg-slate-100/50 dark:hover:bg-slate-800/50"
+            >
               <TableCell className="font-medium">{score.username}</TableCell>
               <TableCell>{score.score}</TableCell>
               <TableCell>{score.accuracy}%</TableCell>
