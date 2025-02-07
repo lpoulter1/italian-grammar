@@ -1,101 +1,160 @@
-import Image from "next/image";
+"use client";
+
+import { useState, useEffect } from "react";
+import { Verb, PersonType } from "@/types/verbs";
+import { getRandomVerb } from "@/utils/conjugation";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 
 export default function Home() {
-  return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-8 row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-semibold">
-              src/app/page.tsx
-            </code>
-            .
-          </li>
-          <li>Save and see your changes instantly.</li>
-        </ol>
+  const [currentVerb, setCurrentVerb] = useState<Verb | null>(null);
+  const [userAnswers, setUserAnswers] = useState<Record<PersonType, string>>({
+    io: "",
+    tu: "",
+    lui: "",
+    noi: "",
+    voi: "",
+    loro: "",
+  });
+  const [showResults, setShowResults] = useState(false);
+  const [score, setScore] = useState(0);
+  const [totalAttempts, setTotalAttempts] = useState(0);
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:min-w-44"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+  useEffect(() => {
+    loadNewVerb();
+  }, []);
+
+  const loadNewVerb = () => {
+    setCurrentVerb(getRandomVerb());
+    setUserAnswers({
+      io: "",
+      tu: "",
+      lui: "",
+      noi: "",
+      voi: "",
+      loro: "",
+    });
+    setShowResults(false);
+  };
+
+  const handleInputChange = (person: PersonType, value: string) => {
+    setUserAnswers((prev) => ({
+      ...prev,
+      [person]: value.toLowerCase(),
+    }));
+  };
+
+  const checkAnswers = () => {
+    if (!currentVerb) return;
+
+    let correct = 0;
+    Object.entries(currentVerb.conjugations).forEach(
+      ([person, conjugation]) => {
+        if (userAnswers[person as PersonType].trim() === conjugation) {
+          correct++;
+        }
+      }
+    );
+
+    setScore((prev) => prev + correct);
+    setTotalAttempts((prev) => prev + 6);
+    setShowResults(true);
+  };
+
+  if (!currentVerb) return <div>Loading...</div>;
+
+  const accuracy =
+    totalAttempts > 0 ? Math.round((score / totalAttempts) * 100) : 0;
+
+  return (
+    <main className="min-h-screen p-4 md:p-8 bg-gradient-to-b from-blue-50 to-white">
+      <div className="max-w-2xl mx-auto space-y-8">
+        <div className="text-center space-y-2">
+          <h1 className="text-4xl font-bold text-gray-900">
+            Italian Verb Practice
+          </h1>
+          <p className="text-gray-500">
+            Master Italian verb conjugations through practice
+          </p>
         </div>
-      </main>
-      <footer className="row-start-3 flex gap-6 flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
-    </div>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-2xl text-center">
+              {currentVerb.infinitive}
+            </CardTitle>
+            <CardDescription className="text-center">
+              {currentVerb.meaning} - {currentVerb.type} conjugation
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {(Object.entries(userAnswers) as [PersonType, string][]).map(
+              ([person, value]) => (
+                <div key={person} className="space-y-2">
+                  <label className="text-sm font-medium text-gray-700">
+                    {person}:
+                  </label>
+                  <div className="relative">
+                    <Input
+                      value={value}
+                      onChange={(e) =>
+                        handleInputChange(person, e.target.value)
+                      }
+                      className={`${
+                        showResults
+                          ? value.trim() === currentVerb.conjugations[person]
+                            ? "border-green-500 bg-green-50"
+                            : "border-red-500 bg-red-50"
+                          : ""
+                      }`}
+                      disabled={showResults}
+                    />
+                    {showResults && (
+                      <span
+                        className={`text-sm mt-1 ${
+                          value.trim() === currentVerb.conjugations[person]
+                            ? "text-green-600"
+                            : "text-red-600"
+                        }`}
+                      >
+                        {currentVerb.conjugations[person]}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              )
+            )}
+          </CardContent>
+          <CardFooter className="flex justify-center">
+            {showResults ? (
+              <Button onClick={loadNewVerb} variant="default" size="lg">
+                Next Verb
+              </Button>
+            ) : (
+              <Button onClick={checkAnswers} variant="default" size="lg">
+                Check Answers
+              </Button>
+            )}
+          </CardFooter>
+        </Card>
+
+        <Card>
+          <CardContent className="text-center py-6">
+            <div className="text-2xl font-semibold">
+              Score: {score}/{totalAttempts}
+            </div>
+            <div className="text-sm text-gray-500">Accuracy: {accuracy}%</div>
+          </CardContent>
+        </Card>
+      </div>
+    </main>
   );
 }
