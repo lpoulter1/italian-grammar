@@ -1,6 +1,7 @@
 export type Score = {
   id: string;
   username: string;
+  email?: string | null;
   score: number;
   accuracy: number;
   verb_type: string;

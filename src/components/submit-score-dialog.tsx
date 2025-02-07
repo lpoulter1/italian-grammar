@@ -29,6 +29,7 @@ export function SubmitScoreDialog({
   totalAttempts,
 }: SubmitScoreDialogProps) {
   const [username, setUsername] = useState("");
+  const [email, setEmail] = useState("");
   const [isOpen, setIsOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -39,6 +40,7 @@ export function SubmitScoreDialog({
     try {
       await onSubmit({
         username: username.trim(),
+        email: email.trim() || null,
         score,
         accuracy,
         verb_type: verbType,
@@ -61,7 +63,8 @@ export function SubmitScoreDialog({
         <DialogHeader>
           <DialogTitle>Submit Your Score</DialogTitle>
           <DialogDescription>
-            Enter your name to submit your score to the leaderboard.
+            Enter your name to submit your score to the leaderboard. Add your
+            email to get notified when someone beats your score!
           </DialogDescription>
         </DialogHeader>
         <div className="grid gap-4 py-4">
@@ -75,6 +78,19 @@ export function SubmitScoreDialog({
               onChange={(e) => setUsername(e.target.value)}
               className="col-span-3"
               placeholder="Enter your name"
+            />
+          </div>
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label htmlFor="email" className="text-right">
+              Email
+            </Label>
+            <Input
+              id="email"
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className="col-span-3"
+              placeholder="Enter your email (optional)"
             />
           </div>
           <div className="grid grid-cols-4 items-center gap-4">
