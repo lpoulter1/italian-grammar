@@ -38,9 +38,10 @@ export function SubmitScoreDialog({
 
     setIsSubmitting(true);
     try {
+      console.log("Submitting with email:", email.trim() || undefined);
       await onSubmit({
         username: username.trim(),
-        email: email.trim() || null,
+        email: email.trim() || undefined,
         score,
         accuracy,
         verb_type: verbType,

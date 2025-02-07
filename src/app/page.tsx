@@ -137,12 +137,14 @@ export default function Home() {
       const { error } = await supabase.from("scores").insert([
         {
           username: newScore.username,
+          email: newScore.email,
           score: newScore.score,
           accuracy: newScore.accuracy,
           verb_type: newScore.verb_type,
           total_attempts: newScore.total_attempts,
         },
       ]);
+
       if (error) throw error;
       loadScores();
     } catch (error) {
