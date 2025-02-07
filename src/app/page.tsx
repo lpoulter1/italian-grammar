@@ -18,7 +18,6 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { verbs } from "@/data/verbs";
 import { Scoreboard } from "@/components/scoreboard";
 import { SubmitScoreDialog } from "@/components/submit-score-dialog";
-import { supabase } from "@/lib/supabase";
 import { Score, NewScore } from "@/types/scores";
 
 export default function Home() {
@@ -117,14 +116,12 @@ export default function Home() {
 
   const loadScores = async () => {
     try {
-      const { data, error } = await supabase
-        .from("scores")
-        .select("*")
-        .order("score", { ascending: false })
-        .limit(10);
-
-      if (error) throw error;
-      setScores(data || []);
+      const response = await fetch("/api/scores");
+      if (!response.ok) {
+        throw new Error("Failed to load scores");
+      }
+      const data = await response.json();
+      setScores(data);
     } catch (error) {
       console.error("Error loading scores:", error);
     } finally {
@@ -134,18 +131,18 @@ export default function Home() {
 
   const handleSubmitScore = async (newScore: NewScore) => {
     try {
-      const { error } = await supabase.from("scores").insert([
-        {
-          username: newScore.username,
-          email: newScore.email,
-          score: newScore.score,
-          accuracy: newScore.accuracy,
-          verb_type: newScore.verb_type,
-          total_attempts: newScore.total_attempts,
+      const response = await fetch("/api/submit-score", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
         },
-      ]);
+        body: JSON.stringify(newScore),
+      });
 
-      if (error) throw error;
+      if (!response.ok) {
+        throw new Error("Failed to submit score");
+      }
+
       loadScores();
     } catch (error) {
       console.error("Error submitting score:", error);
@@ -246,12 +243,14 @@ export default function Home() {
                   {currentVerb.meaning} - {currentVerb.type} conjugation
                 </CardDescription>
               </CardHeader>
-              <CardContent className="space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   {(Object.entries(userAnswers) as [PersonType, string][]).map(
                     ([person, value]) => (
-                      <div key={person} className="space-y-2">
-                        <label className="text-sm font-medium">{person}:</label>
+                      <div key={person} className="space-y-1.5">
+                        <label className="text-sm font-medium block">
+                          {person}:
+                        </label>
                         <Input
                           type="text"
                           value={value}
@@ -302,23 +301,23 @@ export default function Home() {
                   </div>
                 )}
               </CardContent>
-              <CardFooter className="flex justify-between">
+              <CardFooter className="flex flex-col sm:flex-row justify-between gap-4">
                 <Button
                   variant="outline"
                   onClick={toggleHint}
-                  className="w-28 dark:border-slate-700 dark:hover:bg-slate-800"
+                  className="w-full sm:w-28 dark:border-slate-700 dark:hover:bg-slate-800"
                 >
                   {showHint ? "Hide Hint" : "Show Hint"}
                 </Button>
-                <div className="space-x-2">
+                <div className="flex flex-col sm:flex-row gap-4 sm:gap-2 w-full sm:w-auto">
                   <Button
                     variant="outline"
                     onClick={loadNewVerb}
-                    className="w-28 dark:border-slate-700 dark:hover:bg-slate-800"
+                    className="w-full sm:w-28 dark:border-slate-700 dark:hover:bg-slate-800"
                   >
                     Skip
                   </Button>
-                  <Button onClick={checkAnswers} className="w-28">
+                  <Button onClick={checkAnswers} className="w-full sm:w-28">
                     Check
                   </Button>
                 </div>
