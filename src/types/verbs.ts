@@ -4,17 +4,18 @@ export type ConjugationPattern = {
   [key in PersonType]: string;
 };
 
-export type VerbType = "all" | "are" | "ere" | "ire" | "ire-isc";
+export type BaseVerbType = "are" | "ere" | "ire" | "ire-isc";
+export type VerbType = BaseVerbType | "all";
 
 export type Verb = {
   infinitive: string;
   meaning: string;
-  type: Exclude<VerbType, "all">;
+  type: BaseVerbType;
   conjugations: ConjugationPattern;
 };
 
 export type VerbGroup = {
-  type: Exclude<VerbType, "all">;
+  type: BaseVerbType;
   pattern: ConjugationPattern;
   description: string;
 };

@@ -1,11 +1,11 @@
-import { Verb, VerbType } from "@/types/verbs";
+import { Verb, BaseVerbType } from "@/types/verbs";
 import { verbPatterns, verbs } from "@/data/verbs";
 
 export const getVerbStem = (infinitive: string): string => {
   return infinitive.slice(0, -3);
 };
 
-export const getVerbType = (infinitive: string): VerbType => {
+export const getVerbType = (infinitive: string): BaseVerbType => {
   if (infinitive.endsWith("are")) return "are";
   if (infinitive.endsWith("ere")) return "ere";
   // Check known -isc verbs
