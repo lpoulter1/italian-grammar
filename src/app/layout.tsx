@@ -1,19 +1,16 @@
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
 import "./globals.css";
-
-const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
   title: "Italian Verb Practice",
   description:
     "Master Italian verb conjugations through interactive practice. Learn -are, -ere, and -ire verbs with instant feedback.",
-  metadataBase: new URL("https://italian-grammar.vercel.app"),
+  metadataBase: new URL("http://localhost:3001"),
   openGraph: {
     title: "Italian Verb Practice",
     description:
       "Master Italian verb conjugations through interactive practice. Learn -are, -ere, and -ire verbs with instant feedback.",
-    url: "https://italian-grammar.vercel.app",
+    url: "http://localhost:3001",
     siteName: "Italian Verb Practice",
     images: [
       {
@@ -49,7 +46,13 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body className={inter.className}>{children}</body>
+      <head>
+        <link
+          href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
+          rel="stylesheet"
+        />
+      </head>
+      <body className="font-sans">{children}</body>
     </html>
   );
 }

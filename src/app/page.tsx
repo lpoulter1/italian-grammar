@@ -15,6 +15,10 @@ import {
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { verbs } from "@/data/verbs";
+import { Scoreboard } from "@/components/scoreboard";
+import { SubmitScoreDialog } from "@/components/submit-score-dialog";
+import { supabase } from "@/lib/supabase";
+import { Score, NewScore } from "@/types/scores";
 
 export default function Home() {
   const [currentVerb, setCurrentVerb] = useState<Verb | null>(null);
@@ -34,11 +38,14 @@ export default function Home() {
   const [showResults, setShowResults] = useState(false);
   const [score, setScore] = useState(0);
   const [totalAttempts, setTotalAttempts] = useState(0);
+  const [scores, setScores] = useState<Score[]>([]);
+  const [isLoadingScores, setIsLoadingScores] = useState(true);
 
   useEffect(() => {
     setUsedVerbs(new Set());
     setCycleCount(0);
     loadNewVerb();
+    loadScores();
   }, [selectedType]);
 
   const getAvailableVerbs = (type: VerbType): Verb[] => {
@@ -105,6 +112,42 @@ export default function Home() {
 
   const toggleHint = () => {
     setShowHint((prev) => !prev);
+  };
+
+  const loadScores = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("scores")
+        .select("*")
+        .order("score", { ascending: false })
+        .limit(10);
+
+      if (error) throw error;
+      setScores(data || []);
+    } catch (error) {
+      console.error("Error loading scores:", error);
+    } finally {
+      setIsLoadingScores(false);
+    }
+  };
+
+  const handleSubmitScore = async (newScore: NewScore) => {
+    try {
+      const { error } = await supabase.from("scores").insert([
+        {
+          username: newScore.username,
+          score: newScore.score,
+          accuracy: newScore.accuracy,
+          verb_type: newScore.verb_type,
+          total_attempts: newScore.total_attempts,
+        },
+      ]);
+      if (error) throw error;
+      loadScores();
+    } catch (error) {
+      console.error("Error submitting score:", error);
+      throw error;
+    }
   };
 
   if (!currentVerb) return <div>Loading...</div>;
@@ -297,6 +340,25 @@ export default function Home() {
               Score: {score}/{totalAttempts}
             </div>
             <div className="text-sm text-gray-500">Accuracy: {accuracy}%</div>
+            <div className="mt-4">
+              <SubmitScoreDialog
+                onSubmit={handleSubmitScore}
+                score={score}
+                accuracy={accuracy}
+                verbType={selectedType}
+                totalAttempts={totalAttempts}
+              />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Leaderboard</CardTitle>
+            <CardDescription>Top 10 scores from all players</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Scoreboard scores={scores} isLoading={isLoadingScores} />
           </CardContent>
         </Card>
       </div>
