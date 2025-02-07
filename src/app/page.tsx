@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { Verb, PersonType } from "@/types/verbs";
-import { getRandomVerb } from "@/utils/conjugation";
+import { getRandomVerb, getHintVerb } from "@/utils/conjugation";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -16,6 +16,8 @@ import { Input } from "@/components/ui/input";
 
 export default function Home() {
   const [currentVerb, setCurrentVerb] = useState<Verb | null>(null);
+  const [hintVerb, setHintVerb] = useState<Verb | null>(null);
+  const [showHint, setShowHint] = useState(false);
   const [userAnswers, setUserAnswers] = useState<Record<PersonType, string>>({
     io: "",
     tu: "",
@@ -33,7 +35,9 @@ export default function Home() {
   }, []);
 
   const loadNewVerb = () => {
-    setCurrentVerb(getRandomVerb());
+    const newVerb = getRandomVerb();
+    setCurrentVerb(newVerb);
+    setHintVerb(getHintVerb(newVerb));
     setUserAnswers({
       io: "",
       tu: "",
@@ -43,6 +47,7 @@ export default function Home() {
       loro: "",
     });
     setShowResults(false);
+    setShowHint(false);
   };
 
   const handleInputChange = (person: PersonType, value: string) => {
@@ -67,6 +72,10 @@ export default function Home() {
     setScore((prev) => prev + correct);
     setTotalAttempts((prev) => prev + 6);
     setShowResults(true);
+  };
+
+  const toggleHint = () => {
+    setShowHint((prev) => !prev);
   };
 
   if (!currentVerb) return <div>Loading...</div>;
@@ -95,42 +104,78 @@ export default function Home() {
               {currentVerb.meaning} - {currentVerb.type} conjugation
             </CardDescription>
           </CardHeader>
-          <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {(Object.entries(userAnswers) as [PersonType, string][]).map(
-              ([person, value]) => (
-                <div key={person} className="space-y-2">
-                  <label className="text-sm font-medium text-gray-700">
-                    {person}:
-                  </label>
-                  <div className="relative">
-                    <Input
-                      value={value}
-                      onChange={(e) =>
-                        handleInputChange(person, e.target.value)
-                      }
-                      className={`${
-                        showResults
-                          ? value.trim() === currentVerb.conjugations[person]
-                            ? "border-green-500 bg-green-50"
-                            : "border-red-500 bg-red-50"
-                          : ""
-                      }`}
-                      disabled={showResults}
-                    />
-                    {showResults && (
-                      <span
-                        className={`text-sm mt-1 ${
-                          value.trim() === currentVerb.conjugations[person]
-                            ? "text-green-600"
-                            : "text-red-600"
+          <CardContent className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {(Object.entries(userAnswers) as [PersonType, string][]).map(
+                ([person, value]) => (
+                  <div key={person} className="space-y-2">
+                    <label className="text-sm font-medium text-gray-700">
+                      {person}:
+                    </label>
+                    <div className="relative">
+                      <Input
+                        value={value}
+                        onChange={(e) =>
+                          handleInputChange(person, e.target.value)
+                        }
+                        className={`${
+                          showResults
+                            ? value.trim() === currentVerb.conjugations[person]
+                              ? "border-green-500 bg-green-50"
+                              : "border-red-500 bg-red-50"
+                            : ""
                         }`}
-                      >
-                        {currentVerb.conjugations[person]}
-                      </span>
+                        disabled={showResults}
+                      />
+                      {showResults && (
+                        <span
+                          className={`text-sm mt-1 ${
+                            value.trim() === currentVerb.conjugations[person]
+                              ? "text-green-600"
+                              : "text-red-600"
+                          }`}
+                        >
+                          {currentVerb.conjugations[person]}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                )
+              )}
+            </div>
+
+            {!showResults && (
+              <div className="flex justify-center">
+                <Button
+                  onClick={toggleHint}
+                  variant="outline"
+                  className="text-blue-600 hover:text-blue-700"
+                >
+                  {showHint ? "Hide Hint" : "Show Hint"}
+                </Button>
+              </div>
+            )}
+
+            {showHint && hintVerb && (
+              <Card className="bg-blue-50 border-blue-200">
+                <CardHeader>
+                  <CardTitle className="text-lg text-center">
+                    Pattern Example: {hintVerb.infinitive} ({hintVerb.meaning})
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-2 text-sm">
+                    {Object.entries(hintVerb.conjugations).map(
+                      ([person, conjugation]) => (
+                        <div key={person} className="flex justify-between">
+                          <span className="font-medium">{person}:</span>
+                          <span className="text-blue-700">{conjugation}</span>
+                        </div>
+                      )
                     )}
                   </div>
-                </div>
-              )
+                </CardContent>
+              </Card>
             )}
           </CardContent>
           <CardFooter className="flex justify-center">

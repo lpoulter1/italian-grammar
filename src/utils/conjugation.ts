@@ -15,6 +15,15 @@ export const getVerbType = (infinitive: string): VerbType => {
   return "ire";
 };
 
+export const getHintVerb = (currentVerb: Verb): Verb | null => {
+  const sameTypeVerbs = verbs.filter(
+    (v) =>
+      v.type === currentVerb.type && v.infinitive !== currentVerb.infinitive
+  );
+  if (sameTypeVerbs.length === 0) return null;
+  return sameTypeVerbs[Math.floor(Math.random() * sameTypeVerbs.length)];
+};
+
 export const conjugateVerb = (infinitive: string): Verb => {
   // Check if it's a known verb
   const knownVerb = verbs.find((v) => v.infinitive === infinitive);
