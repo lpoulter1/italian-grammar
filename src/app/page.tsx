@@ -8,7 +8,6 @@ import { ThemeToggle } from "@/components/ThemeToggle";
 import {
   Card,
   CardContent,
-  CardDescription,
   CardFooter,
   CardHeader,
   CardTitle,
@@ -239,9 +238,26 @@ export default function Home() {
                 <CardTitle className="text-2xl text-center">
                   {currentVerb.infinitive}
                 </CardTitle>
-                <CardDescription className="text-center">
-                  {currentVerb.meaning} - {currentVerb.type} conjugation
-                </CardDescription>
+                <div className="text-sm text-muted-foreground text-center space-y-2">
+                  <div>
+                    {currentVerb.meaning} - {currentVerb.type} conjugation
+                  </div>
+                  <div className="text-xs bg-blue-50 dark:bg-blue-950/50 p-2 rounded-md">
+                    <div className="font-medium text-blue-700 dark:text-blue-300">
+                      Quick Tip:
+                    </div>
+                    <div className="text-blue-600 dark:text-blue-400">
+                      {currentVerb.type === "are" &&
+                        "First conjugation (-are) verbs are the most common and regular."}
+                      {currentVerb.type === "ere" &&
+                        "Second conjugation (-ere) verbs often have unique patterns."}
+                      {currentVerb.type === "ire" &&
+                        "Third conjugation (-ire) verbs can follow two patterns."}
+                      {currentVerb.type === "ire-isc" &&
+                        "Some -ire verbs add -isc- in certain forms (io, tu, lui/lei, loro)."}
+                    </div>
+                  </div>
+                </div>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -249,11 +265,49 @@ export default function Home() {
                     ([person, value]) => (
                       <div key={person} className="space-y-1.5">
                         <label className="text-sm font-medium block">
-                          {person}:
+                          <span className="flex items-center gap-2">
+                            {person}
+                            <span className="text-xs text-muted-foreground">
+                              {person === "io" && "(I)"}
+                              {person === "tu" && "(you)"}
+                              {person === "lui" && "(he/she/it)"}
+                              {person === "noi" && "(we)"}
+                              {person === "voi" && "(you all)"}
+                              {person === "loro" && "(they)"}
+                            </span>
+                          </span>
                         </label>
                         <Input
                           type="text"
                           value={value}
+                          placeholder={
+                            person === "io"
+                              ? `I ${currentVerb.meaning.replace("to ", "")}...`
+                              : person === "tu"
+                              ? `you ${currentVerb.meaning.replace(
+                                  "to ",
+                                  ""
+                                )}...`
+                              : person === "lui"
+                              ? `he/she ${currentVerb.meaning.replace(
+                                  "to ",
+                                  ""
+                                )}s...`
+                              : person === "noi"
+                              ? `we ${currentVerb.meaning.replace(
+                                  "to ",
+                                  ""
+                                )}...`
+                              : person === "voi"
+                              ? `you all ${currentVerb.meaning.replace(
+                                  "to ",
+                                  ""
+                                )}...`
+                              : `they ${currentVerb.meaning.replace(
+                                  "to ",
+                                  ""
+                                )}...`
+                          }
                           onChange={(e) =>
                             handleInputChange(person, e.target.value)
                           }
