@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import {
@@ -55,6 +55,36 @@ export default function Home() {
   const [totalAttempts, setTotalAttempts] = useState(0);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [showConjugations, setShowConjugations] = useState(false);
+  const [answeredCorrectly, setAnsweredCorrectly] = useState<Set<string>>(
+    new Set()
+  );
+  const [allSentences, setAllSentences] = useState<SentenceTemplate[]>([]);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  // Add a state to prevent immediate submission after card transition
+  const [preventSubmission, setPreventSubmission] = useState(false);
+
+  // Ensure we prevent form submission right after navigating to a new card
+  useEffect(() => {
+    if (preventSubmission) {
+      // Reset after a short delay to allow the new card to load
+      const timer = setTimeout(() => {
+        setPreventSubmission(false);
+      }, 300);
+      return () => clearTimeout(timer);
+    }
+  }, [preventSubmission]);
+
+  // Auto-focus the input field whenever a new card is shown or after reset
+  useEffect(() => {
+    if (
+      mode === Mode.TYPING &&
+      feedback === FeedbackType.NONE &&
+      inputRef.current
+    ) {
+      inputRef.current.focus();
+    }
+  }, [currentSentenceIndex, mode, feedback]);
 
   // Function to get the current sentence
   const getCurrentSentence = (): SentenceTemplate | undefined => {
@@ -97,10 +127,43 @@ export default function Home() {
       allTemplates.push(...verbTemplates);
     }
 
-    setSentences(allTemplates);
+    // Store all sentences and filter out answered ones
+    setAllSentences(allTemplates);
+    filterAnsweredCards(allTemplates);
+
+    // Reset the current sentence index
     setCurrentSentenceIndex(0);
     resetCard();
   }, [selectedVerbs]);
+
+  // Filter out cards that have been answered correctly
+  const filterAnsweredCards = (
+    templates: SentenceTemplate[] = allSentences
+  ) => {
+    const filteredCards = templates.filter(
+      (template) =>
+        !answeredCorrectly.has(`${template.verb}-${template.person}`)
+    );
+    setSentences(filteredCards);
+
+    // Make sure the current index doesn't exceed the number of available cards
+    if (
+      currentSentenceIndex >= filteredCards.length &&
+      filteredCards.length > 0
+    ) {
+      setCurrentSentenceIndex(0);
+    }
+  };
+
+  // Reset all progress
+  const resetProgress = () => {
+    setAnsweredCorrectly(new Set());
+    setTotalScore(0);
+    setTotalAttempts(0);
+    filterAnsweredCards();
+    setCurrentSentenceIndex(0);
+    resetCard();
+  };
 
   // Generate templates for all conjugations of a specific verb
   const generateVerbSpecificTemplates = (
@@ -201,6 +264,17 @@ export default function Home() {
     if (cleanUserAnswer === correctAnswer) {
       setFeedback(FeedbackType.CORRECT);
       setTotalScore((prev) => prev + 1);
+
+      // Add this card to the correctly answered set
+      const key = `${currentSentence.verb}-${currentSentence.person}`;
+      setAnsweredCorrectly((prev) => {
+        const newSet = new Set(prev);
+        newSet.add(key);
+        return newSet;
+      });
+
+      // Filter the deck immediately after marking a card as correct
+      filterAnsweredCards();
     } else if (isAlmostCorrect(cleanUserAnswer, correctAnswer)) {
       setFeedback(FeedbackType.ALMOST);
     } else {
@@ -226,11 +300,22 @@ export default function Home() {
   };
 
   const handleNext = () => {
-    if (currentSentenceIndex < sentences.length - 1) {
-      setCurrentSentenceIndex((prev) => prev + 1);
-    } else {
-      // Restart at the beginning when we've gone through all cards
-      setCurrentSentenceIndex(0);
+    // Set the flag to prevent immediate submission on the next card
+    setPreventSubmission(true);
+
+    // Check if we're at the end of the current deck
+    if (currentSentenceIndex >= sentences.length - 1) {
+      // If there are still cards left after filtering, start from the beginning
+      if (sentences.length > 0) {
+        setCurrentSentenceIndex(0);
+      }
+      // If no cards left, the completion screen will show automatically
+    } else if (sentences.length > 0) {
+      // Not at the end yet, just go to the next card
+      // But make sure we don't exceed the array bounds
+      setCurrentSentenceIndex((prev) =>
+        Math.min(prev + 1, sentences.length - 1)
+      );
     }
     resetCard();
   };
@@ -484,7 +569,7 @@ export default function Home() {
           </div>
         </div>
 
-        {currentSentence ? (
+        {sentences.length > 0 ? (
           <Card className="border-slate-200 dark:border-slate-800 shadow-lg">
             <CardHeader>
               <div className="flex justify-between items-center w-full">
@@ -505,104 +590,128 @@ export default function Home() {
                 </Button>
               </div>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="text-lg font-medium text-center p-4 bg-slate-50 dark:bg-slate-900 rounded-md border border-slate-200 dark:border-slate-800">
-                {currentSentence.sentence}
-              </div>
-
-              {/* Add the infinitive form of the verb */}
-              <div className="flex items-center justify-center gap-2 text-center flex-wrap">
-                <span className="font-medium text-blue-600 dark:text-blue-400">
-                  Verb:
-                </span>
-                <span className="font-bold">{currentSentence.verb}</span>
-                {/* Show irregular tag if the verb is irregular */}
-                {verbs.find((v) => v.infinitive === currentSentence.verb)
-                  ?.isIrregular && (
-                  <span className="px-1.5 py-0.5 text-xs bg-amber-100 text-amber-900 dark:bg-amber-900/50 dark:text-amber-300 rounded-sm">
-                    irregular
-                  </span>
-                )}
-                {/* Find the verb in the verbs array to show its meaning */}
-                {verbs.find((v) => v.infinitive === currentSentence.verb) && (
-                  <span className="text-sm text-muted-foreground">
-                    (
-                    {
-                      verbs.find((v) => v.infinitive === currentSentence.verb)
-                        ?.meaning
-                    }
-                    )
-                  </span>
-                )}
-                {/* Remove the practice all forms button, keep only the show conjugations button */}
-                <div className="flex flex-wrap gap-2 justify-center mt-4">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setShowConjugations(!showConjugations)}
-                    className="text-xs dark:border-slate-700"
-                  >
-                    {showConjugations ? "Hide" : "Show"} All Conjugations
-                  </Button>
+            {currentSentence && (
+              <CardContent className="space-y-4">
+                <div className="text-lg font-medium text-center p-4 bg-slate-50 dark:bg-slate-900 rounded-md border border-slate-200 dark:border-slate-800">
+                  {currentSentence.sentence}
                 </div>
-              </div>
 
-              {/* Display conjugation table */}
-              {showConjugations && currentSentence && (
-                <div className="mt-4 p-4 bg-slate-50 dark:bg-slate-900 rounded-md border border-slate-200 dark:border-slate-800">
-                  <h3 className="text-md font-medium mb-2 text-center">
-                    All Conjugations for &ldquo;{currentSentence.verb}&rdquo;
-                  </h3>
-                  <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                    {Object.entries(
-                      verbs.find((v) => v.infinitive === currentSentence.verb)
-                        ?.conjugations || {}
-                    ).map(([person, conjugation]) => (
-                      <div
-                        key={person}
-                        className={`p-2 rounded-md ${
-                          person === currentSentence.person
-                            ? "bg-blue-100 dark:bg-blue-900/30 border border-blue-300 dark:border-blue-700"
-                            : "bg-transparent"
-                        }`}
-                      >
-                        <div className="font-medium">{person}</div>
-                        <div className="text-lg">{conjugation}</div>
-                      </div>
-                    ))}
+                {/* Add the infinitive form of the verb */}
+                <div className="flex items-center justify-center gap-2 text-center flex-wrap">
+                  <span className="font-medium text-blue-600 dark:text-blue-400">
+                    Verb:
+                  </span>
+                  <span className="font-bold">{currentSentence.verb}</span>
+                  {/* Show irregular tag if the verb is irregular */}
+                  {verbs.find((v) => v.infinitive === currentSentence.verb)
+                    ?.isIrregular && (
+                    <span className="px-1.5 py-0.5 text-xs bg-amber-100 text-amber-900 dark:bg-amber-900/50 dark:text-amber-300 rounded-sm">
+                      irregular
+                    </span>
+                  )}
+                  {/* Find the verb in the verbs array to show its meaning */}
+                  {verbs.find((v) => v.infinitive === currentSentence.verb) && (
+                    <span className="text-sm text-muted-foreground">
+                      (
+                      {
+                        verbs.find((v) => v.infinitive === currentSentence.verb)
+                          ?.meaning
+                      }
+                      )
+                    </span>
+                  )}
+                  {/* Remove the practice all forms button, keep only the show conjugations button */}
+                  <div className="flex flex-wrap gap-2 justify-center mt-4">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setShowConjugations(!showConjugations)}
+                      className="text-xs dark:border-slate-700"
+                    >
+                      {showConjugations ? "Hide" : "Show"} All Conjugations
+                    </Button>
                   </div>
                 </div>
-              )}
 
-              {showTranslation && (
-                <div className="text-sm text-muted-foreground text-center italic">
-                  {currentSentence.translation}
-                </div>
-              )}
+                {/* Display conjugation table */}
+                {showConjugations && (
+                  <div className="mt-4 p-4 bg-slate-50 dark:bg-slate-900 rounded-md border border-slate-200 dark:border-slate-800">
+                    <h3 className="text-md font-medium mb-2 text-center">
+                      All Conjugations for &ldquo;{currentSentence.verb}&rdquo;
+                    </h3>
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                      {Object.entries(
+                        verbs.find((v) => v.infinitive === currentSentence.verb)
+                          ?.conjugations || {}
+                      ).map(([person, conjugation]) => (
+                        <div
+                          key={person}
+                          className={`p-2 rounded-md ${
+                            person === currentSentence.person
+                              ? "bg-blue-100 dark:bg-blue-900/30 border border-blue-300 dark:border-blue-700"
+                              : "bg-transparent"
+                          }`}
+                        >
+                          <div className="font-medium">{person}</div>
+                          <div className="text-lg">{conjugation}</div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
-              {mode === Mode.TYPING && (
-                <div className="space-y-2">
-                  <label className="text-sm font-medium block">
-                    Your answer:
-                  </label>
-                  <Input
-                    type="text"
-                    value={userAnswer}
-                    onChange={(e) => setUserAnswer(e.target.value)}
-                    placeholder="Type the conjugated verb..."
-                    className="w-full bg-transparent dark:text-white"
-                    disabled={feedback !== FeedbackType.NONE}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" && feedback === FeedbackType.NONE) {
-                        handleCheck();
-                      }
-                    }}
-                  />
-                </div>
-              )}
+                {showTranslation && (
+                  <div className="text-sm text-muted-foreground text-center italic">
+                    {currentSentence.translation}
+                  </div>
+                )}
 
-              {renderFeedback()}
-            </CardContent>
+                {mode === Mode.TYPING && (
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium block">
+                      Your answer:
+                    </label>
+                    <form
+                      onSubmit={(e) => {
+                        e.preventDefault();
+
+                        // If we just navigated to a new card, don't submit
+                        if (preventSubmission) return;
+
+                        if (feedback === FeedbackType.NONE) {
+                          handleCheck();
+                        } else if (feedback !== FeedbackType.REVEALED) {
+                          handleNext();
+                        }
+                      }}
+                    >
+                      <Input
+                        ref={inputRef}
+                        type="text"
+                        value={userAnswer}
+                        onChange={(e) => setUserAnswer(e.target.value)}
+                        placeholder="Type the conjugated verb..."
+                        className="w-full bg-transparent dark:text-white"
+                        disabled={feedback !== FeedbackType.NONE}
+                        // Add keyboard handler for explicit next card navigation
+                        onKeyDown={(e) => {
+                          if (
+                            e.key === "Enter" &&
+                            feedback !== FeedbackType.NONE &&
+                            feedback !== FeedbackType.REVEALED
+                          ) {
+                            e.preventDefault(); // Prevent form submission
+                            handleNext();
+                          }
+                        }}
+                      />
+                    </form>
+                  </div>
+                )}
+
+                {renderFeedback()}
+              </CardContent>
+            )}
             <CardFooter className="flex flex-col sm:flex-row justify-between gap-4">
               {mode === Mode.TYPING && feedback === FeedbackType.NONE && (
                 <>
@@ -621,19 +730,59 @@ export default function Home() {
 
               {feedback !== FeedbackType.NONE &&
                 feedback !== FeedbackType.REVEALED && (
-                  <Button onClick={handleNext} className="w-full">
+                  <Button
+                    onClick={handleNext}
+                    className="w-full"
+                    aria-keyshortcuts="Enter"
+                  >
                     Next
                   </Button>
                 )}
             </CardFooter>
           </Card>
         ) : (
-          <div className="text-center py-8 space-y-4">
-            <p className="text-lg font-medium">
-              No cards available for the selected verbs.
-            </p>
-            <Button onClick={() => setSettingsOpen(true)}>Select Verbs</Button>
-          </div>
+          <Card className="border-slate-200 dark:border-slate-800 shadow-lg p-8">
+            <div className="text-center py-8 space-y-6">
+              {allSentences.length > 0 ? (
+                // All cards have been answered correctly - show completion screen
+                <>
+                  <div className="flex justify-center mb-4">
+                    <div className="w-16 h-16 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center">
+                      <CheckIcon className="w-8 h-8 text-green-600 dark:text-green-400" />
+                    </div>
+                  </div>
+                  <h3 className="text-xl font-bold text-slate-900 dark:text-white">
+                    Great job! You&apos;ve completed all the cards.
+                  </h3>
+                  <p className="text-muted-foreground">
+                    You&apos;ve correctly answered all {allSentences.length}{" "}
+                    conjugations!
+                  </p>
+                  <div className="flex gap-4 justify-center mt-6">
+                    <Button onClick={resetProgress} className="mt-4">
+                      Practice Again
+                    </Button>
+                    <Button
+                      variant="outline"
+                      onClick={() => setSettingsOpen(true)}
+                    >
+                      Select Different Verbs
+                    </Button>
+                  </div>
+                </>
+              ) : (
+                // No verbs selected
+                <>
+                  <p className="text-lg font-medium">
+                    No cards available for the selected verbs.
+                  </p>
+                  <Button onClick={() => setSettingsOpen(true)}>
+                    Select Verbs
+                  </Button>
+                </>
+              )}
+            </div>
+          </Card>
         )}
 
         <div className="mt-8">
@@ -645,7 +794,18 @@ export default function Home() {
               <p className="text-muted-foreground">
                 Score: {totalScore} / {totalAttempts} ({accuracy}% accuracy)
               </p>
+              <p className="text-xs text-muted-foreground mt-1">
+                Cards remaining: {sentences.length} / {allSentences.length}
+              </p>
             </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={resetProgress}
+              className="text-xs"
+            >
+              Reset Progress
+            </Button>
           </div>
         </div>
       </div>
