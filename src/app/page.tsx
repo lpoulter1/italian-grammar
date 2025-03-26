@@ -54,6 +54,15 @@ export default function Home() {
   const [totalScore, setTotalScore] = useState(0);
   const [totalAttempts, setTotalAttempts] = useState(0);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [showConjugations, setShowConjugations] = useState(false);
+
+  // Function to get the current sentence
+  const getCurrentSentence = (): SentenceTemplate | undefined => {
+    return sentences[currentSentenceIndex];
+  };
+
+  // Get current sentence
+  const currentSentence = getCurrentSentence();
 
   // Initialize with all verbs selected by default
   useEffect(() => {
@@ -64,34 +73,120 @@ export default function Home() {
 
   // Initialize sentences
   useEffect(() => {
-    // Filter sentences based on selected verbs
-    const filteredSentences =
-      selectedVerbs.length > 0
-        ? hardcodedSentenceTemplates.filter((s) =>
-            selectedVerbs.includes(s.verb)
-          )
-        : hardcodedSentenceTemplates;
+    // Generate complete conjugation templates for all selected verbs
+    const allTemplates = [];
 
-    // If we have no sentences after filtering, use all sentences
-    const sentencesToUse =
-      filteredSentences.length > 0
-        ? filteredSentences
-        : hardcodedSentenceTemplates;
+    // Track which verb+person combinations we've already added
+    const addedCombinations = new Set<string>();
 
-    setSentences(sentencesToUse);
+    // Add hardcoded sentences first (if they match selected verbs)
+    hardcodedSentenceTemplates.forEach((template) => {
+      if (selectedVerbs.includes(template.verb)) {
+        allTemplates.push(template);
+        // Track this verb+person combination
+        addedCombinations.add(`${template.verb}-${template.person}`);
+      }
+    });
+
+    // Generate templates for each selected verb (only for missing persons)
+    for (const verbInfinitive of selectedVerbs) {
+      const verbTemplates = generateVerbSpecificTemplates(
+        verbInfinitive,
+        addedCombinations
+      );
+      allTemplates.push(...verbTemplates);
+    }
+
+    setSentences(allTemplates);
     setCurrentSentenceIndex(0);
     resetCard();
   }, [selectedVerbs]);
+
+  // Generate templates for all conjugations of a specific verb
+  const generateVerbSpecificTemplates = (
+    verbInfinitive: string,
+    existingCombinations: Set<string>
+  ): SentenceTemplate[] => {
+    const templates: SentenceTemplate[] = [];
+    const verb = verbs.find((v) => v.infinitive === verbInfinitive);
+    if (!verb) return templates;
+
+    // Common objects that can be used in sentences
+    const objectMap: Record<string, string[]> = {
+      mangiare: ["la pizza", "la pasta", "il gelato", "la frutta"],
+      parlare: ["italiano", "con gli amici", "al telefono", "di politica"],
+      studiare: ["matematica", "storia", "italiano", "scienze"],
+      lavorare: ["in ufficio", "da casa", "molto", "poco"],
+      leggere: ["un libro", "il giornale", "una rivista", "delle email"],
+      scrivere: ["una lettera", "un messaggio", "un'email", "un articolo"],
+      vedere: ["un film", "la TV", "gli amici", "il paesaggio"],
+      bere: ["acqua", "vino", "caffè", "una bibita"],
+      sentire: ["la musica", "un rumore", "una voce", "il canto degli uccelli"],
+      dormire: ["bene", "male", "poco", "troppo"],
+      capire: ["la lezione", "il concetto", "il problema", "la domanda"],
+      finire: ["il lavoro", "i compiti", "il libro", "la cena"],
+      preferire: ["il caffè", "la pizza", "restare a casa", "viaggiare"],
+    };
+
+    // Create sentences for each conjugation not already covered
+    Object.entries(verb.conjugations).forEach(([person, conjugation]) => {
+      const combinationKey = `${verbInfinitive}-${person}`;
+
+      // Skip if we already have this combination
+      if (!existingCombinations.has(combinationKey)) {
+        // Get objects relevant to this verb or use defaults
+        const objects = objectMap[verbInfinitive] || [
+          "sempre",
+          "spesso",
+          "molto",
+          "",
+        ];
+        const object = objects[Math.floor(Math.random() * objects.length)];
+
+        // Create the sentence
+        const sentence = `${person} ______ ${object}`;
+
+        // Create the translation
+        const translationPerson =
+          person === "io"
+            ? "I"
+            : person === "tu"
+            ? "you"
+            : person === "lui"
+            ? "he/she"
+            : person === "noi"
+            ? "we"
+            : person === "voi"
+            ? "you all"
+            : "they";
+
+        const translation = `${translationPerson} ${verb.meaning.replace(
+          "to ",
+          ""
+        )} ${object}`;
+
+        // Add the template
+        templates.push({
+          sentence,
+          verb: verbInfinitive,
+          person,
+          answer: conjugation,
+          translation,
+        });
+
+        // Mark this combination as added
+        existingCombinations.add(combinationKey);
+      }
+    });
+
+    return templates;
+  };
 
   const resetCard = () => {
     setUserAnswer("");
     setFeedback(FeedbackType.NONE);
     setMode(Mode.TYPING);
     setShowTranslation(false);
-  };
-
-  const getCurrentSentence = (): SentenceTemplate | undefined => {
-    return sentences[currentSentenceIndex];
   };
 
   const handleCheck = () => {
@@ -239,7 +334,6 @@ export default function Home() {
 
   const accuracy =
     totalAttempts > 0 ? Math.round((totalScore / totalAttempts) * 100) : 0;
-  const currentSentence = getCurrentSentence();
 
   // Group verbs by type for the settings dialog
   const verbsByType = {
@@ -417,7 +511,7 @@ export default function Home() {
               </div>
 
               {/* Add the infinitive form of the verb */}
-              <div className="flex items-center justify-center gap-2 text-center">
+              <div className="flex items-center justify-center gap-2 text-center flex-wrap">
                 <span className="font-medium text-blue-600 dark:text-blue-400">
                   Verb:
                 </span>
@@ -440,7 +534,45 @@ export default function Home() {
                     )
                   </span>
                 )}
+                {/* Remove the practice all forms button, keep only the show conjugations button */}
+                <div className="flex flex-wrap gap-2 justify-center mt-4">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowConjugations(!showConjugations)}
+                    className="text-xs dark:border-slate-700"
+                  >
+                    {showConjugations ? "Hide" : "Show"} All Conjugations
+                  </Button>
+                </div>
               </div>
+
+              {/* Display conjugation table */}
+              {showConjugations && currentSentence && (
+                <div className="mt-4 p-4 bg-slate-50 dark:bg-slate-900 rounded-md border border-slate-200 dark:border-slate-800">
+                  <h3 className="text-md font-medium mb-2 text-center">
+                    All Conjugations for &ldquo;{currentSentence.verb}&rdquo;
+                  </h3>
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                    {Object.entries(
+                      verbs.find((v) => v.infinitive === currentSentence.verb)
+                        ?.conjugations || {}
+                    ).map(([person, conjugation]) => (
+                      <div
+                        key={person}
+                        className={`p-2 rounded-md ${
+                          person === currentSentence.person
+                            ? "bg-blue-100 dark:bg-blue-900/30 border border-blue-300 dark:border-blue-700"
+                            : "bg-transparent"
+                        }`}
+                      >
+                        <div className="font-medium">{person}</div>
+                        <div className="text-lg">{conjugation}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               {showTranslation && (
                 <div className="text-sm text-muted-foreground text-center italic">
