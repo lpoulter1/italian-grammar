@@ -1,8 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Verb, PersonType, VerbType } from "@/types/verbs";
-import { getHintVerb } from "@/utils/conjugation";
+import { VerbType } from "@/types/verbs";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import {
@@ -15,102 +14,191 @@ import {
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { verbs } from "@/data/verbs";
+import { SentenceTemplate, hardcodedSentenceTemplates } from "@/data/sentences";
+import { isAlmostCorrect, highlightDifferences } from "@/utils/string";
+import { CheckIcon, XIcon, AlertCircleIcon } from "lucide-react";
+
+enum FeedbackType {
+  NONE,
+  CORRECT,
+  ALMOST,
+  INCORRECT,
+  REVEALED,
+}
+
+enum Mode {
+  TYPING,
+  REVEAL,
+}
 
 export default function Home() {
-  const [currentVerb, setCurrentVerb] = useState<Verb | null>(null);
-  const [hintVerb, setHintVerb] = useState<Verb | null>(null);
-  const [showHint, setShowHint] = useState(false);
   const [selectedType, setSelectedType] = useState<VerbType>("all");
-  const [usedVerbs, setUsedVerbs] = useState<Set<string>>(new Set());
-  const [cycleCount, setCycleCount] = useState(0);
-  const [userAnswers, setUserAnswers] = useState<Record<PersonType, string>>({
-    io: "",
-    tu: "",
-    lui: "",
-    noi: "",
-    voi: "",
-    loro: "",
-  });
-  const [showResults, setShowResults] = useState(false);
-  const [score, setScore] = useState(0);
+  // Flashcard state
+  const [sentences, setSentences] = useState<SentenceTemplate[]>([]);
+  const [currentSentenceIndex, setCurrentSentenceIndex] = useState(0);
+  const [userAnswer, setUserAnswer] = useState("");
+  const [feedback, setFeedback] = useState<FeedbackType>(FeedbackType.NONE);
+  const [mode, setMode] = useState<Mode>(Mode.TYPING);
+  const [showTranslation, setShowTranslation] = useState(false);
+  const [totalScore, setTotalScore] = useState(0);
   const [totalAttempts, setTotalAttempts] = useState(0);
 
+  // Initialize sentences
   useEffect(() => {
-    setUsedVerbs(new Set());
-    setCycleCount(0);
-    loadNewVerb();
+    // For now, use the hardcoded sentences
+    // In a more advanced version, you could use: generateSentenceTemplates(verbs)
+    const filteredSentences =
+      selectedType === "all"
+        ? hardcodedSentenceTemplates
+        : hardcodedSentenceTemplates.filter((s) => {
+            const verb = verbs.find((v) => v.infinitive === s.verb);
+            return verb?.type === selectedType;
+          });
+
+    setSentences(filteredSentences);
+    setCurrentSentenceIndex(0);
+    resetCard();
   }, [selectedType]);
 
-  const getAvailableVerbs = (type: VerbType): Verb[] => {
-    const verbsOfType =
-      type === "all" ? verbs : verbs.filter((v) => v.type === type);
-    return verbsOfType.filter((v) => !usedVerbs.has(v.infinitive));
+  const resetCard = () => {
+    setUserAnswer("");
+    setFeedback(FeedbackType.NONE);
+    setMode(Mode.TYPING);
+    setShowTranslation(false);
   };
 
-  const getRandomVerbOfType = (type: VerbType): Verb => {
-    let availableVerbs = getAvailableVerbs(type);
+  const getCurrentSentence = (): SentenceTemplate | undefined => {
+    return sentences[currentSentenceIndex];
+  };
 
-    if (availableVerbs.length === 0) {
-      setUsedVerbs(new Set());
-      setCycleCount((prev) => prev + 1);
-      availableVerbs =
-        type === "all" ? verbs : verbs.filter((v) => v.type === type);
+  const handleCheck = () => {
+    const currentSentence = getCurrentSentence();
+    if (!currentSentence) return;
+
+    const cleanUserAnswer = userAnswer.trim().toLowerCase();
+    const correctAnswer = currentSentence.answer.toLowerCase();
+
+    setTotalAttempts((prev) => prev + 1);
+
+    if (cleanUserAnswer === correctAnswer) {
+      setFeedback(FeedbackType.CORRECT);
+      setTotalScore((prev) => prev + 1);
+    } else if (isAlmostCorrect(cleanUserAnswer, correctAnswer)) {
+      setFeedback(FeedbackType.ALMOST);
+    } else {
+      setFeedback(FeedbackType.INCORRECT);
     }
-
-    const randomVerb =
-      availableVerbs[Math.floor(Math.random() * availableVerbs.length)];
-    setUsedVerbs((prev) => new Set([...prev, randomVerb.infinitive]));
-    return randomVerb;
   };
 
-  const loadNewVerb = () => {
-    const newVerb = getRandomVerbOfType(selectedType);
-    setCurrentVerb(newVerb);
-    setHintVerb(getHintVerb(newVerb));
-    setUserAnswers({
-      io: "",
-      tu: "",
-      lui: "",
-      noi: "",
-      voi: "",
-      loro: "",
-    });
-    setShowResults(false);
-    setShowHint(false);
+  const handleReveal = () => {
+    setMode(Mode.REVEAL);
+    setFeedback(FeedbackType.REVEALED);
   };
 
-  const handleInputChange = (person: PersonType, value: string) => {
-    setUserAnswers((prev) => ({
-      ...prev,
-      [person]: value.toLowerCase(),
-    }));
+  const handleSelfReport = (knewIt: boolean) => {
+    if (knewIt) {
+      setTotalScore((prev) => prev + 1);
+    }
+    setTotalAttempts((prev) => prev + 1);
+
+    // Advance to next card after a short delay
+    setTimeout(() => {
+      handleNext();
+    }, 1000);
   };
 
-  const checkAnswers = () => {
-    if (!currentVerb) return;
-
-    let correct = 0;
-    Object.entries(currentVerb.conjugations).forEach(
-      ([person, conjugation]) => {
-        if (userAnswers[person as PersonType].trim() === conjugation) {
-          correct++;
-        }
-      }
-    );
-
-    setScore((prev) => prev + correct);
-    setTotalAttempts((prev) => prev + 6);
-    setShowResults(true);
+  const handleNext = () => {
+    if (currentSentenceIndex < sentences.length - 1) {
+      setCurrentSentenceIndex((prev) => prev + 1);
+    } else {
+      // Restart at the beginning when we've gone through all cards
+      setCurrentSentenceIndex(0);
+    }
+    resetCard();
   };
 
-  const toggleHint = () => {
-    setShowHint((prev) => !prev);
-  };
+  const renderFeedback = () => {
+    const currentSentence = getCurrentSentence();
+    if (!currentSentence) return null;
 
-  if (!currentVerb) return <div>Loading...</div>;
+    switch (feedback) {
+      case FeedbackType.CORRECT:
+        return (
+          <div className="flex items-center mt-4 p-3 bg-green-100 dark:bg-green-900/20 rounded-md text-green-700 dark:text-green-300">
+            <CheckIcon className="w-5 h-5 mr-2" />
+            <p>Correct! Well done.</p>
+          </div>
+        );
+      case FeedbackType.ALMOST:
+        return (
+          <div className="flex items-center mt-4 p-3 bg-yellow-100 dark:bg-yellow-900/20 rounded-md text-yellow-700 dark:text-yellow-300">
+            <AlertCircleIcon className="w-5 h-5 mr-2" />
+            <div>
+              <p>Almost correct!</p>
+              <p>
+                The correct answer is:{" "}
+                <span className="font-bold">{currentSentence.answer}</span>
+              </p>
+              <p>
+                You typed: <span className="font-bold">{userAnswer}</span>
+              </p>
+            </div>
+          </div>
+        );
+      case FeedbackType.INCORRECT:
+        return (
+          <div className="flex items-center mt-4 p-3 bg-red-100 dark:bg-red-900/20 rounded-md text-red-700 dark:text-red-300">
+            <XIcon className="w-5 h-5 mr-2" />
+            <div>
+              <p>Incorrect!</p>
+              <p>
+                The correct answer is:{" "}
+                <span className="font-bold">{currentSentence.answer}</span>
+              </p>
+              <p
+                dangerouslySetInnerHTML={{
+                  __html: `Difference: ${highlightDifferences(
+                    userAnswer,
+                    currentSentence.answer
+                  )}`,
+                }}
+              />
+            </div>
+          </div>
+        );
+      case FeedbackType.REVEALED:
+        return (
+          <div className="flex flex-col items-center mt-4 p-3 bg-blue-100 dark:bg-blue-900/20 rounded-md text-blue-700 dark:text-blue-300">
+            <p>
+              The correct answer is:{" "}
+              <span className="font-bold">{currentSentence.answer}</span>
+            </p>
+            <div className="flex gap-2 mt-2">
+              <Button
+                variant="outline"
+                onClick={() => handleSelfReport(true)}
+                className="border-green-500 text-green-600 hover:bg-green-50 dark:border-green-700 dark:text-green-400 dark:hover:bg-green-950/30"
+              >
+                Pass
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => handleSelfReport(false)}
+                className="border-red-500 text-red-600 hover:bg-red-50 dark:border-red-700 dark:text-red-400 dark:hover:bg-red-950/30"
+              >
+                Fail
+              </Button>
+            </div>
+          </div>
+        );
+      default:
+        return null;
+    }
+  };
 
   const accuracy =
-    totalAttempts > 0 ? Math.round((score / totalAttempts) * 100) : 0;
+    totalAttempts > 0 ? Math.round((totalScore / totalAttempts) * 100) : 0;
+  const currentSentence = getCurrentSentence();
   const verbCountByType = {
     all: verbs.length,
     are: verbs.filter((v) => v.type === "are").length,
@@ -119,35 +207,17 @@ export default function Home() {
     "ire-isc": verbs.filter((v) => v.type === "ire-isc").length,
   };
 
-  const availableVerbsCount = getAvailableVerbs(selectedType).length;
-  const totalVerbsInType =
-    selectedType === "all"
-      ? verbs.length
-      : verbs.filter((v) => v.type === selectedType).length;
-
   return (
     <main className="min-h-screen p-4 md:p-8 bg-gradient-to-b from-blue-50 to-white dark:from-slate-950 dark:to-slate-900">
       <div className="max-w-2xl mx-auto space-y-8">
         <div className="flex justify-between items-center">
           <div className="text-center flex-grow space-y-2">
             <h1 className="text-4xl font-bold text-slate-900 dark:text-white">
-              Italian Verb Practice
+              Italian Verb Flashcards
             </h1>
             <p className="text-muted-foreground">
               Master Italian verb conjugations through practice
             </p>
-            <div className="text-sm space-y-1">
-              <p className="text-blue-600 dark:text-blue-400">
-                {availableVerbsCount} verbs remaining in current set
-              </p>
-              {cycleCount > 0 && (
-                <p className="text-green-600 dark:text-green-400">
-                  Completed {cycleCount} full{" "}
-                  {cycleCount === 1 ? "cycle" : "cycles"} of {totalVerbsInType}{" "}
-                  verbs
-                </p>
-              )}
-            </div>
           </div>
           <ThemeToggle />
         </div>
@@ -191,150 +261,98 @@ export default function Home() {
           </TabsList>
 
           <TabsContent value={selectedType}>
-            <Card className="border-slate-200 dark:border-slate-800 shadow-lg">
-              <CardHeader>
-                <CardTitle className="text-2xl text-center">
-                  {currentVerb.infinitive}
-                </CardTitle>
-                <div className="text-sm text-muted-foreground text-center space-y-2">
-                  <div>
-                    {currentVerb.meaning} - {currentVerb.type} conjugation
-                  </div>
-                  <div className="text-xs bg-blue-50 dark:bg-blue-950/50 p-2 rounded-md">
-                    <div className="font-medium text-blue-700 dark:text-blue-300">
-                      Quick Tip:
-                    </div>
-                    <div className="text-blue-600 dark:text-blue-400">
-                      {currentVerb.type === "are" &&
-                        "First conjugation (-are) verbs are the most common and regular."}
-                      {currentVerb.type === "ere" &&
-                        "Second conjugation (-ere) verbs often have unique patterns."}
-                      {currentVerb.type === "ire" &&
-                        "Third conjugation (-ire) verbs can follow two patterns."}
-                      {currentVerb.type === "ire-isc" &&
-                        "Some -ire verbs add -isc- in certain forms (io, tu, lui/lei, loro)."}
+            {currentSentence ? (
+              <Card className="border-slate-200 dark:border-slate-800 shadow-lg">
+                <CardHeader>
+                  <div className="flex justify-between items-center w-full">
+                    <CardTitle className="text-2xl">
+                      Fill in the blank
+                    </CardTitle>
+                    <div className="text-sm text-muted-foreground">
+                      Card {currentSentenceIndex + 1} of {sentences.length}
                     </div>
                   </div>
-                </div>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  {(Object.entries(userAnswers) as [PersonType, string][]).map(
-                    ([person, value]) => (
-                      <div key={person} className="space-y-1.5">
-                        <label className="text-sm font-medium block">
-                          <span className="flex items-center gap-2">
-                            {person}
-                            <span className="text-xs text-muted-foreground">
-                              {person === "io" && "(I)"}
-                              {person === "tu" && "(you)"}
-                              {person === "lui" && "(he/she/it)"}
-                              {person === "noi" && "(we)"}
-                              {person === "voi" && "(you all)"}
-                              {person === "loro" && "(they)"}
-                            </span>
-                          </span>
-                        </label>
-                        <Input
-                          type="text"
-                          value={value}
-                          placeholder={
-                            person === "io"
-                              ? `I ${currentVerb.meaning.replace("to ", "")}...`
-                              : person === "tu"
-                              ? `you ${currentVerb.meaning.replace(
-                                  "to ",
-                                  ""
-                                )}...`
-                              : person === "lui"
-                              ? `he/she ${currentVerb.meaning.replace(
-                                  "to ",
-                                  ""
-                                )}s...`
-                              : person === "noi"
-                              ? `we ${currentVerb.meaning.replace(
-                                  "to ",
-                                  ""
-                                )}...`
-                              : person === "voi"
-                              ? `you all ${currentVerb.meaning.replace(
-                                  "to ",
-                                  ""
-                                )}...`
-                              : `they ${currentVerb.meaning.replace(
-                                  "to ",
-                                  ""
-                                )}...`
-                          }
-                          onChange={(e) =>
-                            handleInputChange(person, e.target.value)
-                          }
-                          className={`w-full bg-transparent dark:text-white ${
-                            showResults
-                              ? value.trim() ===
-                                currentVerb.conjugations[person]
-                                ? "border-green-500 dark:border-green-400 dark:bg-green-950/20"
-                                : "border-red-500 dark:border-red-400 dark:bg-red-950/20"
-                              : "dark:border-slate-700"
-                          }`}
-                        />
-                        {showResults && (
-                          <p
-                            className={`text-sm ${
-                              value.trim() === currentVerb.conjugations[person]
-                                ? "text-green-600 dark:text-green-400"
-                                : "text-red-600 dark:text-red-400"
-                            }`}
-                          >
-                            {currentVerb.conjugations[person]}
-                          </p>
-                        )}
-                      </div>
-                    )
+                  {/* Optional translation toggle */}
+                  <div className="flex justify-end">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setShowTranslation(!showTranslation)}
+                      className="text-xs dark:border-slate-700"
+                    >
+                      {showTranslation ? "Hide" : "Show"} Translation
+                    </Button>
+                  </div>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="text-lg font-medium text-center p-4 bg-slate-50 dark:bg-slate-900 rounded-md border border-slate-200 dark:border-slate-800">
+                    {currentSentence.sentence}
+                  </div>
+
+                  {showTranslation && (
+                    <div className="text-sm text-muted-foreground text-center italic">
+                      {currentSentence.translation}
+                    </div>
                   )}
-                </div>
-                {showHint && hintVerb && (
-                  <div className="mt-4 p-4 bg-blue-50 dark:bg-blue-950/50 rounded-lg border border-blue-100 dark:border-blue-900">
-                    <p className="text-sm text-blue-600 dark:text-blue-400">
-                      Hint: {hintVerb.infinitive} ({hintVerb.meaning})
-                    </p>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mt-2">
-                      {Object.entries(hintVerb.conjugations).map(
-                        ([person, conjugation]) => (
-                          <p
-                            key={person}
-                            className="text-sm text-blue-600 dark:text-blue-400"
-                          >
-                            {person}: {conjugation}
-                          </p>
-                        )
-                      )}
+
+                  {mode === Mode.TYPING && (
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium block">
+                        Your answer:
+                      </label>
+                      <Input
+                        type="text"
+                        value={userAnswer}
+                        onChange={(e) => setUserAnswer(e.target.value)}
+                        placeholder="Type the conjugated verb..."
+                        className="w-full bg-transparent dark:text-white"
+                        disabled={feedback !== FeedbackType.NONE}
+                        onKeyDown={(e) => {
+                          if (
+                            e.key === "Enter" &&
+                            feedback === FeedbackType.NONE
+                          ) {
+                            handleCheck();
+                          }
+                        }}
+                      />
                     </div>
-                  </div>
-                )}
-              </CardContent>
-              <CardFooter className="flex flex-col sm:flex-row justify-between gap-4">
-                <Button
-                  variant="outline"
-                  onClick={toggleHint}
-                  className="w-full sm:w-28 dark:border-slate-700 dark:hover:bg-slate-800"
-                >
-                  {showHint ? "Hide Hint" : "Show Hint"}
-                </Button>
-                <div className="flex flex-col sm:flex-row gap-4 sm:gap-2 w-full sm:w-auto">
-                  <Button
-                    variant="outline"
-                    onClick={loadNewVerb}
-                    className="w-full sm:w-28 dark:border-slate-700 dark:hover:bg-slate-800"
-                  >
-                    Skip
-                  </Button>
-                  <Button onClick={checkAnswers} className="w-full sm:w-28">
-                    Check
-                  </Button>
-                </div>
-              </CardFooter>
-            </Card>
+                  )}
+
+                  {renderFeedback()}
+                </CardContent>
+                <CardFooter className="flex flex-col sm:flex-row justify-between gap-4">
+                  {mode === Mode.TYPING && feedback === FeedbackType.NONE && (
+                    <>
+                      <Button
+                        variant="outline"
+                        onClick={handleReveal}
+                        className="w-full sm:w-auto dark:border-slate-700 dark:hover:bg-slate-800"
+                      >
+                        I don't know - show me
+                      </Button>
+                      <Button
+                        onClick={handleCheck}
+                        className="w-full sm:w-auto"
+                      >
+                        Check
+                      </Button>
+                    </>
+                  )}
+
+                  {feedback !== FeedbackType.NONE &&
+                    feedback !== FeedbackType.REVEALED && (
+                      <Button onClick={handleNext} className="w-full">
+                        Next
+                      </Button>
+                    )}
+                </CardFooter>
+              </Card>
+            ) : (
+              <div className="text-center py-8">
+                No cards available for this verb type.
+              </div>
+            )}
           </TabsContent>
         </Tabs>
 
@@ -345,7 +363,7 @@ export default function Home() {
                 Your Progress
               </h2>
               <p className="text-muted-foreground">
-                Score: {score} / {totalAttempts} ({accuracy}% accuracy)
+                Score: {totalScore} / {totalAttempts} ({accuracy}% accuracy)
               </p>
             </div>
           </div>
