@@ -289,6 +289,28 @@ export default function Home() {
                     {currentSentence.sentence}
                   </div>
 
+                  {/* Add the infinitive form of the verb */}
+                  <div className="flex items-center justify-center gap-2 text-center">
+                    <span className="font-medium text-blue-600 dark:text-blue-400">
+                      Verb:
+                    </span>
+                    <span className="font-bold">{currentSentence.verb}</span>
+                    {/* Find the verb in the verbs array to show its meaning */}
+                    {verbs.find(
+                      (v) => v.infinitive === currentSentence.verb
+                    ) && (
+                      <span className="text-sm text-muted-foreground">
+                        (
+                        {
+                          verbs.find(
+                            (v) => v.infinitive === currentSentence.verb
+                          )?.meaning
+                        }
+                        )
+                      </span>
+                    )}
+                  </div>
+
                   {showTranslation && (
                     <div className="text-sm text-muted-foreground text-center italic">
                       {currentSentence.translation}
