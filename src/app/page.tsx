@@ -27,6 +27,7 @@ import {
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { userSettings } from "@/services/userSettings";
 
 enum FeedbackType {
   NONE,
@@ -59,10 +60,91 @@ export default function Home() {
     new Set()
   );
   const [allSentences, setAllSentences] = useState<SentenceTemplate[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [saveIndicator, setSaveIndicator] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   // Add a state to prevent immediate submission after card transition
   const [preventSubmission, setPreventSubmission] = useState(false);
+
+  // Load settings on mount
+  useEffect(() => {
+    // Set loading state
+    setIsLoading(true);
+
+    // Load selected verbs
+    const savedVerbs = userSettings.getSelectedVerbs();
+    if (savedVerbs.length > 0) {
+      setSelectedVerbs(savedVerbs);
+    } else {
+      // Default to all verbs if none are saved
+      setSelectedVerbs(verbs.map((v) => v.infinitive));
+    }
+
+    // Load progress data
+    const progress = userSettings.getProgress();
+    setTotalScore(progress.totalScore);
+    setTotalAttempts(progress.totalAttempts);
+
+    if (Array.isArray(progress.answeredCorrectly)) {
+      setAnsweredCorrectly(new Set(progress.answeredCorrectly));
+    }
+
+    // Load UI preferences
+    const uiPrefs = userSettings.getUiPreferences();
+    setShowTranslation(uiPrefs.showTranslation);
+    setShowConjugations(uiPrefs.showConjugations);
+
+    // Finish loading
+    setIsLoading(false);
+  }, []);
+
+  // Save selected verbs when they change
+  useEffect(() => {
+    if (selectedVerbs.length > 0) {
+      userSettings.saveSelectedVerbs(selectedVerbs);
+
+      // Show save indicator
+      setSaveIndicator("Settings saved");
+      const timer = setTimeout(() => setSaveIndicator(null), 2000);
+      return () => clearTimeout(timer);
+    }
+  }, [selectedVerbs]);
+
+  // Save progress when it changes
+  useEffect(() => {
+    // Skip initial render
+    if (isLoading) return;
+
+    userSettings.saveProgress({
+      totalScore,
+      totalAttempts,
+      answeredCorrectly: Array.from(answeredCorrectly),
+    });
+
+    // Show save indicator when progress changes
+    if (totalScore > 0 || totalAttempts > 0) {
+      setSaveIndicator("Progress saved");
+      const timer = setTimeout(() => setSaveIndicator(null), 2000);
+      return () => clearTimeout(timer);
+    }
+  }, [totalScore, totalAttempts, answeredCorrectly, isLoading]);
+
+  // Save UI preferences when they change
+  useEffect(() => {
+    // Skip initial render
+    if (isLoading) return;
+
+    userSettings.saveUiPreferences({
+      showTranslation,
+      showConjugations,
+    });
+
+    // Show save indicator
+    setSaveIndicator("Preferences saved");
+    const timer = setTimeout(() => setSaveIndicator(null), 2000);
+    return () => clearTimeout(timer);
+  }, [showTranslation, showConjugations, isLoading]);
 
   // Ensure we prevent form submission right after navigating to a new card
   useEffect(() => {
@@ -112,13 +194,6 @@ export default function Home() {
 
   // Get current sentence
   const currentSentence = getCurrentSentence();
-
-  // Initialize with all verbs selected by default
-  useEffect(() => {
-    if (selectedVerbs.length === 0) {
-      setSelectedVerbs(verbs.map((v) => v.infinitive));
-    }
-  }, []);
 
   // Initialize sentences
   useEffect(() => {
@@ -174,11 +249,15 @@ export default function Home() {
     }
   };
 
-  // Reset all progress
+  // Modify resetProgress to use the UserSettings service
   const resetProgress = () => {
     setAnsweredCorrectly(new Set());
     setTotalScore(0);
     setTotalAttempts(0);
+
+    // Clear progress in storage
+    userSettings.resetProgress();
+
     filterAnsweredCards();
     setCurrentSentenceIndex(0);
     resetCard();
@@ -449,6 +528,24 @@ export default function Home() {
 
   return (
     <main className="min-h-screen p-4 md:p-8 bg-gradient-to-b from-blue-50 to-white dark:from-slate-950 dark:to-slate-900">
+      {/* Add animation styles */}
+      <style jsx global>{`
+        @keyframes fadeOut {
+          0% {
+            opacity: 1;
+          }
+          80% {
+            opacity: 1;
+          }
+          100% {
+            opacity: 0;
+          }
+        }
+        .animate-fade-out {
+          animation: fadeOut 2s ease-in-out forwards;
+        }
+      `}</style>
+
       <div className="max-w-2xl mx-auto space-y-8">
         <div className="flex justify-between items-center">
           <div className="text-center flex-grow space-y-2">
@@ -459,7 +556,12 @@ export default function Home() {
               Master Italian verb conjugations through practice
             </p>
           </div>
-          <div className="flex gap-2">
+          <div className="flex gap-2 items-center">
+            {saveIndicator && (
+              <span className="text-xs text-green-600 dark:text-green-400 animate-fade-out">
+                {saveIndicator}
+              </span>
+            )}
             {/* Settings Dialog */}
             <Dialog open={settingsOpen} onOpenChange={setSettingsOpen}>
               <DialogTrigger asChild>
@@ -588,7 +690,13 @@ export default function Home() {
           </div>
         </div>
 
-        {sentences.length > 0 ? (
+        {isLoading ? (
+          <Card className="border-slate-200 dark:border-slate-800 shadow-lg p-8">
+            <div className="text-center py-8">
+              <p className="text-lg font-medium">Loading your saved data...</p>
+            </div>
+          </Card>
+        ) : sentences.length > 0 ? (
           <Card className="border-slate-200 dark:border-slate-800 shadow-lg">
             <CardHeader>
               <div className="flex justify-between items-center w-full">
