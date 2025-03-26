@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { VerbType } from "@/types/verbs";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import {
@@ -12,11 +11,22 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { verbs } from "@/data/verbs";
 import { SentenceTemplate, hardcodedSentenceTemplates } from "@/data/sentences";
 import { isAlmostCorrect, highlightDifferences } from "@/utils/string";
-import { CheckIcon, XIcon, AlertCircleIcon } from "lucide-react";
+import { CheckIcon, XIcon, AlertCircleIcon, SettingsIcon } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+  DialogFooter,
+  DialogClose,
+} from "@/components/ui/dialog";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 enum FeedbackType {
   NONE,
@@ -32,7 +42,8 @@ enum Mode {
 }
 
 export default function Home() {
-  const [selectedType, setSelectedType] = useState<VerbType>("all");
+  // Replace selectedType with selectedVerbs
+  const [selectedVerbs, setSelectedVerbs] = useState<string[]>([]);
   // Flashcard state
   const [sentences, setSentences] = useState<SentenceTemplate[]>([]);
   const [currentSentenceIndex, setCurrentSentenceIndex] = useState(0);
@@ -42,23 +53,35 @@ export default function Home() {
   const [showTranslation, setShowTranslation] = useState(false);
   const [totalScore, setTotalScore] = useState(0);
   const [totalAttempts, setTotalAttempts] = useState(0);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+
+  // Initialize with all verbs selected by default
+  useEffect(() => {
+    if (selectedVerbs.length === 0) {
+      setSelectedVerbs(verbs.map((v) => v.infinitive));
+    }
+  }, []);
 
   // Initialize sentences
   useEffect(() => {
-    // For now, use the hardcoded sentences
-    // In a more advanced version, you could use: generateSentenceTemplates(verbs)
+    // Filter sentences based on selected verbs
     const filteredSentences =
-      selectedType === "all"
-        ? hardcodedSentenceTemplates
-        : hardcodedSentenceTemplates.filter((s) => {
-            const verb = verbs.find((v) => v.infinitive === s.verb);
-            return verb?.type === selectedType;
-          });
+      selectedVerbs.length > 0
+        ? hardcodedSentenceTemplates.filter((s) =>
+            selectedVerbs.includes(s.verb)
+          )
+        : hardcodedSentenceTemplates;
 
-    setSentences(filteredSentences);
+    // If we have no sentences after filtering, use all sentences
+    const sentencesToUse =
+      filteredSentences.length > 0
+        ? filteredSentences
+        : hardcodedSentenceTemplates;
+
+    setSentences(sentencesToUse);
     setCurrentSentenceIndex(0);
     resetCard();
-  }, [selectedType]);
+  }, [selectedVerbs]);
 
   const resetCard = () => {
     setUserAnswer("");
@@ -115,6 +138,24 @@ export default function Home() {
       setCurrentSentenceIndex(0);
     }
     resetCard();
+  };
+
+  const handleToggleVerb = (verbInfinitive: string) => {
+    setSelectedVerbs((prev) => {
+      if (prev.includes(verbInfinitive)) {
+        return prev.filter((v) => v !== verbInfinitive);
+      } else {
+        return [...prev, verbInfinitive];
+      }
+    });
+  };
+
+  const handleSelectAllVerbs = () => {
+    setSelectedVerbs(verbs.map((v) => v.infinitive));
+  };
+
+  const handleDeselectAllVerbs = () => {
+    setSelectedVerbs([]);
   };
 
   const renderFeedback = () => {
@@ -199,12 +240,13 @@ export default function Home() {
   const accuracy =
     totalAttempts > 0 ? Math.round((totalScore / totalAttempts) * 100) : 0;
   const currentSentence = getCurrentSentence();
-  const verbCountByType = {
-    all: verbs.length,
-    are: verbs.filter((v) => v.type === "are").length,
-    ere: verbs.filter((v) => v.type === "ere").length,
-    ire: verbs.filter((v) => v.type === "ire").length,
-    "ire-isc": verbs.filter((v) => v.type === "ire-isc").length,
+
+  // Group verbs by type for the settings dialog
+  const verbsByType = {
+    are: verbs.filter((v) => v.type === "are"),
+    ere: verbs.filter((v) => v.type === "ere"),
+    ire: verbs.filter((v) => v.type === "ire"),
+    "ire-isc": verbs.filter((v) => v.type === "ire-isc"),
   };
 
   return (
@@ -219,164 +261,192 @@ export default function Home() {
               Master Italian verb conjugations through practice
             </p>
           </div>
-          <ThemeToggle />
-        </div>
-
-        <Tabs
-          defaultValue="all"
-          className="w-full"
-          onValueChange={(value) => setSelectedType(value as VerbType)}
-        >
-          <TabsList className="grid w-full grid-cols-5 mb-8 bg-slate-100/80 dark:bg-slate-800/50">
-            <TabsTrigger value="all">
-              All{" "}
-              <span className="text-muted-foreground ml-1">
-                ({verbCountByType.all})
-              </span>
-            </TabsTrigger>
-            <TabsTrigger value="are">
-              -are{" "}
-              <span className="text-muted-foreground ml-1">
-                ({verbCountByType.are})
-              </span>
-            </TabsTrigger>
-            <TabsTrigger value="ere">
-              -ere{" "}
-              <span className="text-muted-foreground ml-1">
-                ({verbCountByType.ere})
-              </span>
-            </TabsTrigger>
-            <TabsTrigger value="ire">
-              -ire{" "}
-              <span className="text-muted-foreground ml-1">
-                ({verbCountByType.ire})
-              </span>
-            </TabsTrigger>
-            <TabsTrigger value="ire-isc">
-              -isc{" "}
-              <span className="text-muted-foreground ml-1">
-                ({verbCountByType["ire-isc"]})
-              </span>
-            </TabsTrigger>
-          </TabsList>
-
-          <TabsContent value={selectedType}>
-            {currentSentence ? (
-              <Card className="border-slate-200 dark:border-slate-800 shadow-lg">
-                <CardHeader>
-                  <div className="flex justify-between items-center w-full">
-                    <CardTitle className="text-2xl">
-                      Fill in the blank
-                    </CardTitle>
-                    <div className="text-sm text-muted-foreground">
-                      Card {currentSentenceIndex + 1} of {sentences.length}
-                    </div>
-                  </div>
-                  {/* Optional translation toggle */}
-                  <div className="flex justify-end">
+          <div className="flex gap-2">
+            {/* Settings Dialog */}
+            <Dialog open={settingsOpen} onOpenChange={setSettingsOpen}>
+              <DialogTrigger asChild>
+                <Button variant="outline" size="icon">
+                  <SettingsIcon className="h-5 w-5" />
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="sm:max-w-md">
+                <DialogHeader>
+                  <DialogTitle>Select Verbs</DialogTitle>
+                </DialogHeader>
+                <div className="py-4">
+                  <div className="flex justify-between mb-4">
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => setShowTranslation(!showTranslation)}
-                      className="text-xs dark:border-slate-700"
+                      onClick={handleSelectAllVerbs}
                     >
-                      {showTranslation ? "Hide" : "Show"} Translation
+                      Select All
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleDeselectAllVerbs}
+                    >
+                      Deselect All
                     </Button>
                   </div>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="text-lg font-medium text-center p-4 bg-slate-50 dark:bg-slate-900 rounded-md border border-slate-200 dark:border-slate-800">
-                    {currentSentence.sentence}
+                  <ScrollArea className="h-72 pr-4">
+                    {Object.entries(verbsByType).map(([type, typeVerbs]) => (
+                      <div key={type} className="mb-6">
+                        <h3 className="text-lg font-semibold mb-2">
+                          -{type} verbs
+                        </h3>
+                        <div className="grid grid-cols-2 gap-2">
+                          {typeVerbs.map((verb) => (
+                            <div
+                              key={verb.infinitive}
+                              className="flex items-center space-x-2"
+                            >
+                              <Checkbox
+                                id={verb.infinitive}
+                                checked={selectedVerbs.includes(
+                                  verb.infinitive
+                                )}
+                                onCheckedChange={() =>
+                                  handleToggleVerb(verb.infinitive)
+                                }
+                              />
+                              <Label
+                                htmlFor={verb.infinitive}
+                                className="text-sm cursor-pointer"
+                              >
+                                {verb.infinitive}
+                                <span className="text-xs text-muted-foreground ml-1">
+                                  ({verb.meaning})
+                                </span>
+                              </Label>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </ScrollArea>
+                </div>
+                <DialogFooter>
+                  <div className="w-full text-center text-sm text-muted-foreground">
+                    Selected {selectedVerbs.length} of {verbs.length} verbs
                   </div>
+                  <DialogClose asChild>
+                    <Button type="button">Done</Button>
+                  </DialogClose>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+            <ThemeToggle />
+          </div>
+        </div>
 
-                  {/* Add the infinitive form of the verb */}
-                  <div className="flex items-center justify-center gap-2 text-center">
-                    <span className="font-medium text-blue-600 dark:text-blue-400">
-                      Verb:
-                    </span>
-                    <span className="font-bold">{currentSentence.verb}</span>
-                    {/* Find the verb in the verbs array to show its meaning */}
-                    {verbs.find(
-                      (v) => v.infinitive === currentSentence.verb
-                    ) && (
-                      <span className="text-sm text-muted-foreground">
-                        (
-                        {
-                          verbs.find(
-                            (v) => v.infinitive === currentSentence.verb
-                          )?.meaning
-                        }
-                        )
-                      </span>
-                    )}
-                  </div>
-
-                  {showTranslation && (
-                    <div className="text-sm text-muted-foreground text-center italic">
-                      {currentSentence.translation}
-                    </div>
-                  )}
-
-                  {mode === Mode.TYPING && (
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium block">
-                        Your answer:
-                      </label>
-                      <Input
-                        type="text"
-                        value={userAnswer}
-                        onChange={(e) => setUserAnswer(e.target.value)}
-                        placeholder="Type the conjugated verb..."
-                        className="w-full bg-transparent dark:text-white"
-                        disabled={feedback !== FeedbackType.NONE}
-                        onKeyDown={(e) => {
-                          if (
-                            e.key === "Enter" &&
-                            feedback === FeedbackType.NONE
-                          ) {
-                            handleCheck();
-                          }
-                        }}
-                      />
-                    </div>
-                  )}
-
-                  {renderFeedback()}
-                </CardContent>
-                <CardFooter className="flex flex-col sm:flex-row justify-between gap-4">
-                  {mode === Mode.TYPING && feedback === FeedbackType.NONE && (
-                    <>
-                      <Button
-                        variant="outline"
-                        onClick={handleReveal}
-                        className="w-full sm:w-auto dark:border-slate-700 dark:hover:bg-slate-800"
-                      >
-                        Reveal
-                      </Button>
-                      <Button
-                        onClick={handleCheck}
-                        className="w-full sm:w-auto"
-                      >
-                        Check
-                      </Button>
-                    </>
-                  )}
-
-                  {feedback !== FeedbackType.NONE &&
-                    feedback !== FeedbackType.REVEALED && (
-                      <Button onClick={handleNext} className="w-full">
-                        Next
-                      </Button>
-                    )}
-                </CardFooter>
-              </Card>
-            ) : (
-              <div className="text-center py-8">
-                No cards available for this verb type.
+        {currentSentence ? (
+          <Card className="border-slate-200 dark:border-slate-800 shadow-lg">
+            <CardHeader>
+              <div className="flex justify-between items-center w-full">
+                <CardTitle className="text-2xl">Fill in the blank</CardTitle>
+                <div className="text-sm text-muted-foreground">
+                  Card {currentSentenceIndex + 1} of {sentences.length}
+                </div>
               </div>
-            )}
-          </TabsContent>
-        </Tabs>
+              {/* Optional translation toggle */}
+              <div className="flex justify-end">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowTranslation(!showTranslation)}
+                  className="text-xs dark:border-slate-700"
+                >
+                  {showTranslation ? "Hide" : "Show"} Translation
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="text-lg font-medium text-center p-4 bg-slate-50 dark:bg-slate-900 rounded-md border border-slate-200 dark:border-slate-800">
+                {currentSentence.sentence}
+              </div>
+
+              {/* Add the infinitive form of the verb */}
+              <div className="flex items-center justify-center gap-2 text-center">
+                <span className="font-medium text-blue-600 dark:text-blue-400">
+                  Verb:
+                </span>
+                <span className="font-bold">{currentSentence.verb}</span>
+                {/* Find the verb in the verbs array to show its meaning */}
+                {verbs.find((v) => v.infinitive === currentSentence.verb) && (
+                  <span className="text-sm text-muted-foreground">
+                    (
+                    {
+                      verbs.find((v) => v.infinitive === currentSentence.verb)
+                        ?.meaning
+                    }
+                    )
+                  </span>
+                )}
+              </div>
+
+              {showTranslation && (
+                <div className="text-sm text-muted-foreground text-center italic">
+                  {currentSentence.translation}
+                </div>
+              )}
+
+              {mode === Mode.TYPING && (
+                <div className="space-y-2">
+                  <label className="text-sm font-medium block">
+                    Your answer:
+                  </label>
+                  <Input
+                    type="text"
+                    value={userAnswer}
+                    onChange={(e) => setUserAnswer(e.target.value)}
+                    placeholder="Type the conjugated verb..."
+                    className="w-full bg-transparent dark:text-white"
+                    disabled={feedback !== FeedbackType.NONE}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && feedback === FeedbackType.NONE) {
+                        handleCheck();
+                      }
+                    }}
+                  />
+                </div>
+              )}
+
+              {renderFeedback()}
+            </CardContent>
+            <CardFooter className="flex flex-col sm:flex-row justify-between gap-4">
+              {mode === Mode.TYPING && feedback === FeedbackType.NONE && (
+                <>
+                  <Button
+                    variant="outline"
+                    onClick={handleReveal}
+                    className="w-full sm:w-auto dark:border-slate-700 dark:hover:bg-slate-800"
+                  >
+                    Reveal
+                  </Button>
+                  <Button onClick={handleCheck} className="w-full sm:w-auto">
+                    Check
+                  </Button>
+                </>
+              )}
+
+              {feedback !== FeedbackType.NONE &&
+                feedback !== FeedbackType.REVEALED && (
+                  <Button onClick={handleNext} className="w-full">
+                    Next
+                  </Button>
+                )}
+            </CardFooter>
+          </Card>
+        ) : (
+          <div className="text-center py-8 space-y-4">
+            <p className="text-lg font-medium">
+              No cards available for the selected verbs.
+            </p>
+            <Button onClick={() => setSettingsOpen(true)}>Select Verbs</Button>
+          </div>
+        )}
 
         <div className="mt-8">
           <div className="flex justify-between items-center mb-4">
