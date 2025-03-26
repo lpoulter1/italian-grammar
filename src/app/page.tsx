@@ -290,6 +290,39 @@ export default function Home() {
                       Deselect All
                     </Button>
                   </div>
+
+                  {/* Add quick filter buttons */}
+                  <div className="flex gap-2 mb-4">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() =>
+                        setSelectedVerbs(
+                          verbs
+                            .filter((v) => !v.isIrregular)
+                            .map((v) => v.infinitive)
+                        )
+                      }
+                      className="text-xs"
+                    >
+                      Only Regular Verbs
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() =>
+                        setSelectedVerbs(
+                          verbs
+                            .filter((v) => v.isIrregular)
+                            .map((v) => v.infinitive)
+                        )
+                      }
+                      className="text-xs"
+                    >
+                      Only Irregular Verbs
+                    </Button>
+                  </div>
+
                   <ScrollArea className="h-72 pr-4">
                     {Object.entries(verbsByType).map(([type, typeVerbs]) => (
                       <div key={type} className="mb-6">
@@ -316,6 +349,11 @@ export default function Home() {
                                 className="text-sm cursor-pointer"
                               >
                                 {verb.infinitive}
+                                {verb.isIrregular && (
+                                  <span className="ml-1 px-1 py-0.5 text-xs bg-amber-100 text-amber-900 dark:bg-amber-900/50 dark:text-amber-300 rounded-sm">
+                                    irregular
+                                  </span>
+                                )}
                                 <span className="text-xs text-muted-foreground ml-1">
                                   ({verb.meaning})
                                 </span>
@@ -330,6 +368,17 @@ export default function Home() {
                 <DialogFooter>
                   <div className="w-full text-center text-sm text-muted-foreground">
                     Selected {selectedVerbs.length} of {verbs.length} verbs
+                    <span className="block text-xs">
+                      Including{" "}
+                      {
+                        verbs.filter(
+                          (v) =>
+                            v.isIrregular &&
+                            selectedVerbs.includes(v.infinitive)
+                        ).length
+                      }{" "}
+                      irregular verbs
+                    </span>
                   </div>
                   <DialogClose asChild>
                     <Button type="button">Done</Button>
@@ -373,6 +422,13 @@ export default function Home() {
                   Verb:
                 </span>
                 <span className="font-bold">{currentSentence.verb}</span>
+                {/* Show irregular tag if the verb is irregular */}
+                {verbs.find((v) => v.infinitive === currentSentence.verb)
+                  ?.isIrregular && (
+                  <span className="px-1.5 py-0.5 text-xs bg-amber-100 text-amber-900 dark:bg-amber-900/50 dark:text-amber-300 rounded-sm">
+                    irregular
+                  </span>
+                )}
                 {/* Find the verb in the verbs array to show its meaning */}
                 {verbs.find((v) => v.infinitive === currentSentence.verb) && (
                   <span className="text-sm text-muted-foreground">

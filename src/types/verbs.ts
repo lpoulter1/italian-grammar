@@ -12,6 +12,7 @@ export type Verb = {
   meaning: string;
   type: BaseVerbType;
   conjugations: ConjugationPattern;
+  isIrregular?: boolean;
 };
 
 export type VerbGroup = {
