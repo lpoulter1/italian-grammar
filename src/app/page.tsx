@@ -86,6 +86,25 @@ export default function Home() {
     }
   }, [currentSentenceIndex, mode, feedback]);
 
+  // Global keyboard handler for Enter key to advance cards when feedback is shown
+  useEffect(() => {
+    const handleGlobalKeyDown = (e: KeyboardEvent) => {
+      // Only handle Enter key when feedback is shown but not in reveal mode
+      if (
+        e.key === "Enter" &&
+        feedback !== FeedbackType.NONE &&
+        feedback !== FeedbackType.REVEALED &&
+        !preventSubmission
+      ) {
+        e.preventDefault();
+        handleNext();
+      }
+    };
+
+    window.addEventListener("keydown", handleGlobalKeyDown);
+    return () => window.removeEventListener("keydown", handleGlobalKeyDown);
+  }, [feedback, preventSubmission]);
+
   // Function to get the current sentence
   const getCurrentSentence = (): SentenceTemplate | undefined => {
     return sentences[currentSentenceIndex];
@@ -693,17 +712,6 @@ export default function Home() {
                         placeholder="Type the conjugated verb..."
                         className="w-full bg-transparent dark:text-white"
                         disabled={feedback !== FeedbackType.NONE}
-                        // Add keyboard handler for explicit next card navigation
-                        onKeyDown={(e) => {
-                          if (
-                            e.key === "Enter" &&
-                            feedback !== FeedbackType.NONE &&
-                            feedback !== FeedbackType.REVEALED
-                          ) {
-                            e.preventDefault(); // Prevent form submission
-                            handleNext();
-                          }
-                        }}
                       />
                     </form>
                   </div>
