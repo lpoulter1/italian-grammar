@@ -232,11 +232,11 @@ export default function Home() {
 
   // Filter out cards that have been answered correctly
   const filterAnsweredCards = (
-    templates: SentenceTemplate[] = allSentences
+    templates: SentenceTemplate[] = allSentences,
+    answeredSet: Set<string> = answeredCorrectly
   ) => {
     const filteredCards = templates.filter(
-      (template) =>
-        !answeredCorrectly.has(`${template.verb}-${template.person}`)
+      (template) => !answeredSet.has(`${template.verb}-${template.person}`)
     );
     setSentences(filteredCards);
 
@@ -251,14 +251,19 @@ export default function Home() {
 
   // Modify resetProgress to use the UserSettings service
   const resetProgress = () => {
-    setAnsweredCorrectly(new Set());
+    // Create an empty set first with the correct type
+    const emptySet = new Set<string>();
+
+    // Update state
+    setAnsweredCorrectly(emptySet);
     setTotalScore(0);
     setTotalAttempts(0);
 
     // Clear progress in storage
     userSettings.resetProgress();
 
-    filterAnsweredCards();
+    // Use the empty set directly instead of relying on state update
+    filterAnsweredCards(allSentences, emptySet);
     setCurrentSentenceIndex(0);
     resetCard();
   };
@@ -556,7 +561,7 @@ export default function Home() {
               Master Italian verb conjugations through practice
             </p>
           </div>
-          <div className="flex gap-2 items-center">
+          <div className="flex gap-2 items-center min-w-[120px] justify-end">
             {saveIndicator && (
               <span className="text-xs text-green-600 dark:text-green-400 animate-fade-out">
                 {saveIndicator}
@@ -858,29 +863,35 @@ export default function Home() {
           </Card>
         ) : (
           <Card className="border-slate-200 dark:border-slate-800 shadow-lg p-8">
-            <div className="text-center py-8 space-y-6">
+            <div className="flex flex-col items-center justify-center min-h-[280px] py-8 space-y-8">
               {allSentences.length > 0 ? (
                 // All cards have been answered correctly - show completion screen
                 <>
-                  <div className="flex justify-center mb-4">
-                    <div className="w-16 h-16 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center">
-                      <CheckIcon className="w-8 h-8 text-green-600 dark:text-green-400" />
+                  <div className="flex justify-center">
+                    <div className="w-20 h-20 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center">
+                      <CheckIcon className="w-10 h-10 text-green-600 dark:text-green-400" />
                     </div>
                   </div>
-                  <h3 className="text-xl font-bold text-slate-900 dark:text-white">
-                    Great job! You&apos;ve completed all the cards.
-                  </h3>
-                  <p className="text-muted-foreground">
-                    You&apos;ve correctly answered all {allSentences.length}{" "}
-                    conjugations!
-                  </p>
-                  <div className="flex gap-4 justify-center mt-6">
-                    <Button onClick={resetProgress} className="mt-4">
+                  <div className="space-y-3 text-center">
+                    <h3 className="text-2xl font-bold text-slate-900 dark:text-white">
+                      Great job! You&apos;ve completed all the cards.
+                    </h3>
+                    <p className="text-muted-foreground text-lg">
+                      You&apos;ve correctly answered all {allSentences.length}{" "}
+                      conjugations!
+                    </p>
+                  </div>
+                  <div className="flex gap-6 justify-center pt-4">
+                    <Button
+                      onClick={resetProgress}
+                      className="px-6 py-5 text-md"
+                    >
                       Practice Again
                     </Button>
                     <Button
                       variant="outline"
                       onClick={() => setSettingsOpen(true)}
+                      className="px-6 py-5 text-md"
                     >
                       Select Different Verbs
                     </Button>
@@ -889,10 +900,13 @@ export default function Home() {
               ) : (
                 // No verbs selected
                 <>
-                  <p className="text-lg font-medium">
+                  <p className="text-xl font-medium mb-4">
                     No cards available for the selected verbs.
                   </p>
-                  <Button onClick={() => setSettingsOpen(true)}>
+                  <Button
+                    onClick={() => setSettingsOpen(true)}
+                    className="px-6 py-5 text-md"
+                  >
                     Select Verbs
                   </Button>
                 </>
@@ -907,10 +921,10 @@ export default function Home() {
               <h2 className="text-2xl font-bold text-slate-900 dark:text-white">
                 Your Progress
               </h2>
-              <p className="text-muted-foreground">
+              <p className="text-muted-foreground mt-2">
                 Score: {totalScore} / {totalAttempts} ({accuracy}% accuracy)
               </p>
-              <p className="text-xs text-muted-foreground mt-1">
+              <p className="text-sm text-muted-foreground mt-1">
                 Cards remaining: {sentences.length} / {allSentences.length}
               </p>
             </div>
@@ -918,7 +932,7 @@ export default function Home() {
               variant="outline"
               size="sm"
               onClick={resetProgress}
-              className="text-xs"
+              className="px-4 h-10"
             >
               Reset Progress
             </Button>
