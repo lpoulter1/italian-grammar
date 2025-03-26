@@ -329,7 +329,7 @@ export default function Home() {
                         onClick={handleReveal}
                         className="w-full sm:w-auto dark:border-slate-700 dark:hover:bg-slate-800"
                       >
-                        I don't know - show me
+                        Reveal
                       </Button>
                       <Button
                         onClick={handleCheck}
